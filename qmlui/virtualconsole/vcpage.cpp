@@ -175,6 +175,10 @@ void VCPage::removeWidgetFromMaps(VCWidget *widget)
 
 void VCPage::mapChildrenInputSources()
 {
+    /** map page input sources first */
+    for (QSharedPointer<QLCInputSource> source : inputSources()) // C++11
+        mapInputSource(source, this);
+
     /** Scan all the children widgets and map the detected input sources */
     for (VCWidget *widget : children(true)) // C++11
     {

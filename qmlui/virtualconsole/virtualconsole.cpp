@@ -1801,4 +1801,7 @@ void VirtualConsole::postLoad()
      *  to roll */
     foreach (VCPage *page, m_pages)
         page->mapChildrenInputSources();
+
+    /** Page input sources are mapped only now, so rebuild the page lookup */
+    updatePageInputs();
 }
