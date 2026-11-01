@@ -1371,6 +1371,20 @@ int Tardis::processAction(TardisAction &action, bool undo)
                 m_simpleDesk->resetAbsoluteChannel(scv.channel);
         }
         break;
+        case SimpleDeskResetUniverse:
+        {
+            if (undo)
+            {
+                for (const QVariant &val : value->toList())
+                {
+                    SceneValue scv = val.value<SceneValue>();
+                    m_simpleDesk->setAbsoluteChannelValue(scv.channel, scv.value);
+                }
+            }
+            else
+                m_simpleDesk->resetUniverse(value->toInt());
+        }
+        break;
 
         /* ******************* Virtual console editing actions ******************** */
 

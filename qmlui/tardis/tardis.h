@@ -188,6 +188,7 @@ public:
         /* Simple Desk actions */
         SimpleDeskSetChannel = 0xC000,
         SimpleDeskResetChannel,
+        SimpleDeskResetUniverse,
 
         /* Virtual console editing actions */
         VCWidgetCreate = 0xE000,
