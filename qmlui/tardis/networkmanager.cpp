@@ -26,6 +26,7 @@
 #include <QTimer>
 #include <QFile>
 #include <QDateTime>
+#include <QtEndian>
 
 #include "networkmanager.h"
 #include "app.h"
@@ -35,6 +36,10 @@
 #include "doc.h"
 #include "inputoutputmap.h"
 #include "webaccess-qml.h"
+#include "function.h"
+
+/* Largest uncompressed Function snapshot accepted from a peer */
+#define MAX_SNAPSHOT_SIZE   (16 * 1024 * 1024)
 
 #define DEFAULT_UDP_PORT    9997
 #define DEFAULT_TCP_PORT    9998
@@ -372,6 +377,51 @@ void NetworkManager::sendAction(int code, TardisAction action)
     else
     {
         /* Send packet to the connected server */
+        sendTCPPacket(m_tcpSocket, packet, m_encryptPackets);
+    }
+}
+
+void NetworkManager::sendFunction(quint32 id, int type, const QByteArray &xml)
+{
+    /* Section lengths are 16 bit: compress, since big Shows easily exceed it */
+    QByteArray data = qCompress(xml);
+    if (data.size() > 0xFF00) // the packet's total sections length is 16 bit too
+    {
+        qWarning() << "[TCP] Function" << id << "is too large to sync:" << data.size() << "bytes";
+        return;
+    }
+
+    QByteArray packet;
+    m_packetizer->initializePacket(packet, Tardis::SyncFunction);
+    m_packetizer->addSection(packet, id);
+    /* The type travels apart from the XML so the server can check access rights */
+    m_packetizer->addSection(packet, type);
+    m_packetizer->addSection(packet, data);
+
+    sendToPeers(packet);
+}
+
+void NetworkManager::sendFunctionDeletion(quint32 id)
+{
+    QByteArray packet;
+    m_packetizer->initializePacket(packet, Tardis::SyncFunctionDelete);
+    m_packetizer->addSection(packet, id);
+
+    sendToPeers(packet);
+}
+
+void NetworkManager::sendToPeers(QByteArray &packet)
+{
+    if (m_hostType == ServerHostType)
+    {
+        for (NetworkHost *host : std::as_const(m_hostsMap))
+        {
+            if (host != nullptr && host->isAuthenticated)
+                sendTCPPacket(host->tcpSocket, packet, m_encryptPackets);
+        }
+    }
+    else if (m_tcpSocket != nullptr)
+    {
         sendTCPPacket(m_tcpSocket, packet, m_encryptPackets);
     }
 }
@@ -1336,6 +1386,10 @@ void NetworkManager::slotProcessTCPPackets()
                         break;
                     }
                     int required = requiredAccessMask(actionCode);
+                    /* Shows are edited from the Show Manager */
+                    if (actionCode == Tardis::SyncFunction && paramsList.count() > 1 &&
+                        paramsList.at(1).toInt() == Function::ShowType)
+                        required = App::AC_ShowManager;
                     if (required == 0 || (session->accessMask & required) == 0)
                     {
                         qWarning() << "Dropping unauthorized native action" << actionCode
@@ -1347,6 +1401,32 @@ void NetworkManager::slotProcessTCPPackets()
                 {
                     qWarning() << "[TCP] Dropping packet with empty params list. action"
                                << QString::number(actionCode, 16);
+                    break;
+                }
+
+                /* DocSync snapshots carry the whole Function: they bypass
+                 * Tardis and its echo guard */
+                if (actionCode == Tardis::SyncFunction)
+                {
+                    if (paramsList.count() < 3)
+                        break;
+
+                    /* qCompress() data starts with the uncompressed size, which
+                     * qUncompress() would allocate without question */
+                    QByteArray data = paramsList.at(2).toByteArray();
+                    if (data.size() < 4 || qFromBigEndian<quint32>(data.constData()) > MAX_SNAPSHOT_SIZE)
+                    {
+                        qWarning() << "[TCP] Dropping invalid Function snapshot" << paramsList.at(0).toUInt();
+                        break;
+                    }
+
+                    emit functionReceived(paramsList.at(0).toUInt(), paramsList.at(1).toInt(),
+                                          qUncompress(data));
+                    break;
+                }
+                if (actionCode == Tardis::SyncFunctionDelete)
+                {
+                    emit functionDeletionReceived(paramsList.at(0).toUInt());
                     break;
                 }
 

@@ -243,6 +243,10 @@ void Tardis::forwardActionToNetwork(int code, TardisAction &action, bool undo)
     if (m_networkManager->connectionsCount() == 0)
         return;
 
+    /* Functions are created and deleted on the peers through DocSync */
+    if (code == FunctionCreate || code == FunctionDelete)
+        return;
+
     TardisAction netAction = action;
 
     /* When undoing, the peers must replay what has just been applied locally,
@@ -257,9 +261,41 @@ void Tardis::forwardActionToNetwork(int code, TardisAction &action, bool undo)
         netAction.m_oldValue = action.m_newValue;
     }
 
-    QMetaObject::invokeMethod(m_networkManager, "sendAction", Qt::QueuedConnection,
-            Q_ARG(int, code),
-            Q_ARG(TardisAction, netAction));
+    /* Decided on the main thread, where the Doc can be safely looked up */
+    QMetaObject::invokeMethod(m_networkManager, [this, code, netAction]()
+    {
+        if (isSyncedByDocSync(code, netAction.m_objID) == false)
+            m_networkManager->sendAction(code, netAction);
+    }, Qt::QueuedConnection);
+}
+
+bool Tardis::isSyncedByDocSync(int code, quint32 functionID) const
+{
+    if (code < FunctionCreate || code >= ShowManagerAddTrack)
+        return false;
+
+    /* DocSync doesn't apply changes to existing Shows */
+    Function *function = m_doc->function(functionID);
+    if (function != nullptr && function->type() == Function::ShowType)
+        return false;
+
+    /* Actions whose setter doesn't emit Function::changed(), which DocSync
+     * relies on. Remove a code from here once its setter emits it */
+    static const QSet<int> notSignalled =
+    {
+        FunctionSetPath,
+        SceneAddFixture, SceneRemoveFixture,
+        SceneAddFixtureGroup, SceneRemoveFixtureGroup,
+        SceneAddPalette, SceneRemovePalette,
+        RGBMatrixSetFixtureGroup,
+        RGBMatrixSetScriptIntValue, RGBMatrixSetScriptDoubleValue, RGBMatrixSetScriptStringValue,
+        RGBMatrixSetText, RGBMatrixSetTextFont, RGBMatrixSetImage,
+        RGBMatrixSetOffset, RGBMatrixSetAnimationStyle,
+        AudioSetVolume,
+        VideoSetSource, VideoSetGeometry, VideoSetRotation, VideoSetLayer
+    };
+
+    return notSignalled.contains(code) == false;
 }
 
 void Tardis::run()

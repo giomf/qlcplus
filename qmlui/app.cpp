@@ -63,6 +63,7 @@
 
 #include "tardis.h"
 #include "networkmanager.h"
+#include "docsync.h"
 #include "stagewizard.h"
 
 #include "qlcfixturedefcache.h"
@@ -113,6 +114,7 @@ App::App()
     , m_networkManager(nullptr)
     , m_uiManager(nullptr)
     , m_stageWizard(nullptr)
+    , m_docSync(nullptr)
     , m_doc(nullptr)
     , m_docLoaded(false)
     , m_printItem(nullptr)
@@ -232,6 +234,24 @@ void App::startup()
     m_tardis = new Tardis(this, m_doc, m_networkManager, m_fixtureManager, m_functionManager,
                           m_contextManager, m_simpleDesk, m_showManager, m_virtualConsole);
     rootContext()->setContextProperty("tardis", m_tardis);
+
+    /* Functions are synced as whole snapshots, only while peers are connected */
+    m_docSync = new DocSync(m_doc, this);
+    m_docSync->setEnabled(false);
+    connect(m_networkManager, &NetworkManager::connectionsCountChanged, this, [this]()
+    {
+        m_docSync->setEnabled(m_networkManager->connectionsCount() > 0);
+    });
+    connect(m_docSync, &DocSync::functionUpdated, m_networkManager, &NetworkManager::sendFunction);
+    connect(m_docSync, &DocSync::functionDeleted, m_networkManager, &NetworkManager::sendFunctionDeletion);
+    connect(m_networkManager, &NetworkManager::functionReceived, m_docSync, &DocSync::applyFunction);
+    connect(m_networkManager, &NetworkManager::functionDeletionReceived, this, [this](quint32 id)
+    {
+        /* Go through FunctionManager, which also closes an editor open on it */
+        m_docSync->beginRemoteChange();
+        m_functionManager->deleteFunction(id);
+        m_docSync->endRemoteChange();
+    });
 
     m_stageWizard = new StageWizard(m_doc, m_fixtureManager, m_functionManager,
                                     m_virtualConsole, m_contextManager, this);

@@ -47,6 +47,7 @@ class NetworkManager;
 class VideoProvider;
 class FixtureEditor;
 class StageWizard;
+class DocSync;
 class Tardis;
 class QMouseEvent;
 
@@ -262,6 +263,7 @@ private:
     UiManager *m_uiManager;
     StageWizard *m_stageWizard;
     Tardis *m_tardis;
+    DocSync *m_docSync;
 
     /*********************************************************************
      * Doc

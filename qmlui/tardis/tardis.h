@@ -176,6 +176,10 @@ public:
         VideoSetRotation,
         VideoSetLayer,
 
+        /* Whole Function snapshots, sent by DocSync rather than Tardis */
+        SyncFunction = 0x1F00,
+        SyncFunctionDelete,
+
         /* Show Manager actions */
         ShowManagerAddTrack = 0xB000,
         ShowManagerDeleteTrack,
@@ -315,6 +319,9 @@ public:
      *  transmit, which may differ from action.m_action when @a undo is true
      *  (e.g. undoing a FunctionCreate transmits a FunctionDelete) */
     void forwardActionToNetwork(int code, TardisAction &action, bool undo = false);
+
+    /** Whether DocSync already sends the change made by this Function action */
+    bool isSyncedByDocSync(int code, quint32 functionID) const;
 
     /** @reimp */
     void run() override; // thread run function

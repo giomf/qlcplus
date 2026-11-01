@@ -141,6 +141,10 @@ public:
 public slots:
     void sendAction(int code, TardisAction action);
 
+    /** Send a whole Function snapshot produced by DocSync */
+    void sendFunction(quint32 id, int type, const QByteArray &xml);
+    void sendFunctionDeletion(quint32 id);
+
 protected:
     QString defaultName();
 
@@ -155,6 +159,9 @@ protected:
     /** Send the content of $packet using the provided $socket */
     bool sendTCPPacket(QTcpSocket *socket, QByteArray &packet, bool encrypt);
 
+    /** Send $packet to every authenticated client, or to the server */
+    void sendToPeers(QByteArray &packet);
+
 signals:
     void hostNameChanged(QString hostName);
     void serverTypeChanged(int type);
@@ -162,6 +169,8 @@ signals:
     void serverPasswordChanged(QString password);
     void connectionsCountChanged();
     void actionReady(int code, quint32 id, QVariant value);
+    void functionReceived(quint32 id, int type, const QByteArray &xml);
+    void functionDeletionReceived(quint32 id);
 
 protected slots:
     /** Async event raised when UDP packets are received */
