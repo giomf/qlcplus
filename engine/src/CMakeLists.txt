@@ -21,6 +21,7 @@ add_library(${module_name} ${QLC_LIB_TYPE}
     dmxdumpfactoryproperties.cpp dmxdumpfactoryproperties.h
     dmxsource.h
     doc.cpp doc.h
+    docsync.cpp docsync.h
     efx.cpp efx.h
     efxfixture.cpp efxfixture.h
     fadechannel.cpp fadechannel.h

@@ -621,6 +621,16 @@ public:
     static bool loader(QXmlStreamReader &root, Doc* doc);
 
     /**
+     * Create a new function from an XML tag without adding it to the doc.
+     * The ID found in the tag is not assigned to the function.
+     *
+     * @param root An XML root element of a function
+     * @param doc The QLC document object, used as the function's parent
+     * @return the loaded function, owned by the caller, or NULL on failure
+     */
+    static Function* createFromXML(QXmlStreamReader &root, Doc* doc);
+
+    /**
      * Called for each Function-based object after everything has been loaded.
      * Do any post-load cleanup, function mappings etc. if needed. Default
      * implementation does nothing.

@@ -895,10 +895,31 @@ bool Function::loadXML(QXmlStreamReader &root)
 
 bool Function::loader(QXmlStreamReader &root, Doc* doc)
 {
+    quint32 id = root.attributes().value(KXMLQLCFunctionID).toString().toUInt();
+
+    Function* function = createFromXML(root, doc);
+    if (function == NULL)
+        return false;
+
+    if (doc->addFunction(function, id) == true)
+    {
+        /* Success */
+        return true;
+    }
+    else
+    {
+        qWarning() << "Function" << function->name() << "cannot be created.";
+        delete function;
+        return false;
+    }
+}
+
+Function* Function::createFromXML(QXmlStreamReader &root, Doc* doc)
+{
     if (root.name() != KXMLQLCFunction)
     {
         qWarning("Function node not found!");
-        return false;
+        return NULL;
     }
 
     QXmlStreamAttributes attrs = root.attributes();
@@ -922,7 +943,7 @@ bool Function::loader(QXmlStreamReader &root, Doc* doc)
     if (id == Function::invalidId())
     {
         qWarning() << Q_FUNC_INFO << "Function ID" << id << "is not allowed.";
-        return false;
+        return NULL;
     }
 
     /* Create a new function according to the type */
@@ -948,32 +969,20 @@ bool Function::loader(QXmlStreamReader &root, Doc* doc)
     else if (type == Function::VideoType)
         function = new class Video(doc);
     else
-        return false;
+        return NULL;
 
     function->setName(name);
     function->setPath(path);
     function->setVisible(visible);
     function->setBlendMode(blendMode);
-    if (function->loadXML(root) == true)
-    {
-        if (doc->addFunction(function, id) == true)
-        {
-            /* Success */
-            return true;
-        }
-        else
-        {
-            qWarning() << "Function" << name << "cannot be created.";
-            delete function;
-            return false;
-        }
-    }
-    else
+    if (function->loadXML(root) == false)
     {
         qWarning() << "Function" << name << "cannot be loaded.";
         delete function;
-        return false;
+        return NULL;
     }
+
+    return function;
 }
 
 void Function::postLoad()
